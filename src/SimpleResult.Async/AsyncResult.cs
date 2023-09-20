@@ -56,6 +56,25 @@ public partial record AsyncResult : IConclusion
         });
     }
 
+    internal AsyncResult(Task<Result> action)
+    {
+        _awaitAction = action.ContinueWith(task =>
+        {
+            // Use try/catch to obtain more complete information about exceptions.
+            // (When checking manually, we lose the stacktrace and something else)
+            // If I’m wrong, please write to me in Issue!
+            try
+            {
+                return task.GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                _errors = ImmutableArray.Create<IError>(new ExceptionalError(exception));
+                return Result.Fail(_errors);
+            }
+        });
+    }
+
     internal AsyncResult(IError error) => _errors = ImmutableArray.Create(error);
 
     internal AsyncResult(IEnumerable<IError> errors, bool isFailed = true)
@@ -73,4 +92,6 @@ public partial record AsyncResult : IConclusion
     /// </summary>
     /// <returns>Exception safety awaiter of internal task</returns>
     public TaskAwaiter<Result> GetAwaiter() => _awaitAction.GetAwaiter();
+
+    public static implicit operator AsyncResult(Task<Result> task) => new(task);
 }

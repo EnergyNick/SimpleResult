@@ -82,6 +82,27 @@ public record AsyncResult<TValue> : IConclusion
         });
     }
 
+    internal AsyncResult(Task<Result<TValue>> func)
+    {
+        _awaitAction = func.ContinueWith(task =>
+        {
+            // Use try/catch to obtain more complete information about exceptions.
+            // (When checking manually, we lose the stacktrace and something else)
+            // If I’m wrong, please write to me in Issue!
+            try
+            {
+                var result = task.GetAwaiter().GetResult();
+                _value = result.ValueOrDefault;
+                return result;
+            }
+            catch (Exception exception)
+            {
+                _errors = ImmutableArray.Create<IError>(new ExceptionalError(exception));
+                return Result.Fail<TValue>(_errors);
+            }
+        });
+    }
+
     internal AsyncResult(IError error)
     {
         _errors = ImmutableArray.Create(error);
@@ -104,4 +125,6 @@ public record AsyncResult<TValue> : IConclusion
     /// </summary>
     /// <returns>Exception safety awaiter of internal task</returns>
     public TaskAwaiter<Result<TValue>> GetAwaiter() => _awaitAction.GetAwaiter();
+
+    public static implicit operator AsyncResult<TValue>(Task<Result<TValue>> task) => new(task);
 }
