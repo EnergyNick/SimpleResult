@@ -6,9 +6,6 @@ using SimpleResult.Exceptions;
 
 namespace SimpleResult.Async;
 
-// https://devblogs.microsoft.com/premier-developer/extending-the-async-methods-in-c/
-// https://habr.com/ru/articles/470830/
-
 [AsyncMethodBuilder(typeof(AsyncResultTaskMethodBuilder))]
 public partial record AsyncResult : IConclusion
 {

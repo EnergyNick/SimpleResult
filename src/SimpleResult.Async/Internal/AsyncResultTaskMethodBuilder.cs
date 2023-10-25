@@ -1,7 +1,9 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace SimpleResult.Async.Internal;
 
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class AsyncResultTaskMethodBuilder
 {
     private AsyncTaskMethodBuilder _builder = AsyncTaskMethodBuilder.Create();
@@ -17,12 +19,7 @@ public sealed class AsyncResultTaskMethodBuilder
 
     public AsyncResult Task
     {
-        get
-        {
-            _result ??= new AsyncResult(_builder.Task);
-
-            return _result;
-        }
+        get => _result ??= new AsyncResult(_builder.Task);
         set => _result = value;
     }
 
@@ -45,6 +42,7 @@ public sealed class AsyncResultTaskMethodBuilder
     public void SetStateMachine(IAsyncStateMachine stateMachine) => _builder.SetStateMachine(stateMachine);
 }
 
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class AsyncResultTaskMethodBuilder<TValue>
 {
     private AsyncTaskMethodBuilder<TValue> _builder = AsyncTaskMethodBuilder<TValue>.Create();
@@ -61,12 +59,7 @@ public sealed class AsyncResultTaskMethodBuilder<TValue>
 
     public AsyncResult<TValue> Task
     {
-        get
-        {
-            _result ??= new AsyncResult<TValue>(_builder.Task);
-
-            return _result;
-        }
+        get => _result ??= new AsyncResult<TValue>(_builder.Task);
         set => _result = value;
     }
 
