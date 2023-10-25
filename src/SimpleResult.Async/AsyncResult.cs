@@ -1,26 +1,23 @@
-﻿using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using SimpleResult.Async.Internal;
 using SimpleResult.Core;
-using SimpleResult.Exceptions;
 
 namespace SimpleResult.Async;
 
 [AsyncMethodBuilder(typeof(AsyncResultTaskMethodBuilder))]
-public partial record AsyncResult : IConclusion
+public sealed partial class AsyncResult : IConclusion
 {
-    private readonly Task<Result> _awaitAction = Task.FromResult(Result.Ok());
-    private ImmutableArray<IError> _errors = ImmutableArray<IError>.Empty;
+    private readonly Task<Result> _awaitAction;
 
     /// <summary>
     /// Return true, if result is not contain errors and async method is complete.
     /// </summary>
-    public bool IsSuccess => _errors.Length == 0 && IsCompleted;
+    public bool IsSuccess => IsCompleted && GetOrAwaitSynchronous().Errors.Count == 0;
 
     /// <summary>
     /// Return true, if result is contain errors and async method is complete.
     /// </summary>
-    public bool IsFailed => _errors.Length != 0 && IsCompleted;
+    public bool IsFailed => IsCompleted && GetOrAwaitSynchronous().Errors.Count != 0;
 
     /// <summary>
     /// Return true, if internal task is complete.
@@ -28,10 +25,11 @@ public partial record AsyncResult : IConclusion
     public bool IsCompleted => _awaitAction.IsCompleted;
 
     /// <inheritdoc />
-    public IReadOnlyCollection<IError> Errors => _errors;
+    public IReadOnlyCollection<IError> Errors => IsCompleted
+        ? GetOrAwaitSynchronous().Errors
+        : ArraySegment<IError>.Empty;
 
-    internal AsyncResult()
-    { }
+    internal AsyncResult(Result result) => _awaitAction = Task.FromResult(result);
 
     internal AsyncResult(Task action)
     {
@@ -47,8 +45,7 @@ public partial record AsyncResult : IConclusion
             }
             catch (Exception exception)
             {
-                _errors = ImmutableArray.Create<IError>(new ExceptionalError(exception));
-                return Result.Fail(_errors);
+                return Result.Fail(exception);
             }
         });
     }
@@ -66,23 +63,16 @@ public partial record AsyncResult : IConclusion
             }
             catch (Exception exception)
             {
-                _errors = ImmutableArray.Create<IError>(new ExceptionalError(exception));
-                return Result.Fail(_errors);
+                return Result.Fail(exception);
             }
         });
     }
 
-    internal AsyncResult(IError error) => _errors = ImmutableArray.Create(error);
+    internal AsyncResult(IError error) =>
+        _awaitAction = Task.FromResult(Result.Fail(error));
 
-    internal AsyncResult(IEnumerable<IError> errors, bool isFailed = true)
-    {
-        _errors = errors is IError[] arrayErrors
-            ? ImmutableArray.Create(arrayErrors)
-            : errors.ToImmutableArray();
-
-        if (isFailed && _errors.Length == 0)
-            throw new InvalidResultOperationException("Can't create failed result without errors");
-    }
+    internal AsyncResult(IEnumerable<IError> errors) =>
+        _awaitAction = Task.FromResult(Result.Fail(errors));
 
     /// <summary>
     /// Used for provide API for async/await mechanism.
@@ -90,5 +80,12 @@ public partial record AsyncResult : IConclusion
     /// <returns>Exception safety awaiter of internal task</returns>
     public TaskAwaiter<Result> GetAwaiter() => _awaitAction.GetAwaiter();
 
+    /// <summary>
+    /// Provide valid synchronous way to get result from asynchronous operation
+    /// </summary>
+    /// <returns>Return result of initial async operation</returns>
+    public Result GetOrAwaitSynchronous() => GetAwaiter().GetResult();
+
+    public static implicit operator AsyncResult(Task task) => new(task);
     public static implicit operator AsyncResult(Task<Result> task) => new(task);
 }
